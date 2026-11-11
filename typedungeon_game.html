@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeDungeon - 타자 연습 & 영단어 학습 RPG</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #090d16;
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        canvas {
+            touch-action: none;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-indigo-400">
+                    <i class="fa-solid fa-keyboard text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg text-slate-100 leading-tight tracking-wide">TypeDungeon</h1>
+                    <p class="text-xs text-indigo-400 font-medium">타자 연습 & 영단어 암기 미니 RPG</p>
+                </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+                <button id="tab-game-btn" onclick="switchTab('game')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-md">
+                    <i class="fa-solid fa-gamepad mr-1.5"></i> 게임 플레이
+                </button>
+                <button id="tab-vocab-btn" onclick="switchTab('vocab')" class="px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all duration-200">
+                    <i class="fa-solid fa-book mr-1.5"></i> 단어장 / 오답노트
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+
+        <!-- TAB 1: GAME SCREEN -->
+        <div id="tab-game" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Canvas & Gameplay Area (8 Cols) -->
+            <div class="lg:col-span-8 flex flex-col gap-4">
+                
+                <!-- Status Bar -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900 border border-slate-800 p-3 rounded-2xl shadow-inner">
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block font-medium">현재 점수 (Score)</span>
+                        <span id="score-val" class="text-xl font-bold text-amber-400 code-font">0</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block font-medium">타자 속도 (WPM)</span>
+                        <span id="wpm-val" class="text-xl font-bold text-emerald-400 code-font">0</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block font-medium">플레이어 체력 (HP)</span>
+                        <div class="flex items-center gap-1 mt-1 text-rose-500" id="hp-hearts">
+                            <i class="fa-solid fa-heart"></i>
+                            <i class="fa-solid fa-heart"></i>
+                            <i class="fa-solid fa-heart"></i>
+                            <i class="fa-solid fa-heart"></i>
+                            <i class="fa-solid fa-heart"></i>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block font-medium">스테이지 (Level)</span>
+                        <span id="level-val" class="text-xl font-bold text-indigo-400 code-font">Stage 1</span>
+                    </div>
+                </div>
+
+                <!-- Game Canvas Box -->
+                <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+                    
+                    <div class="w-full aspect-[16/10] bg-slate-950 relative">
+                        <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+                        <!-- Overlay: Start / Game Over Screen -->
+                        <div id="game-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-5 z-20 p-6 text-center">
+                            <div class="p-4 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 animate-bounce">
+                                <i id="overlay-icon" class="fa-solid fa-dungeon text-4xl"></i>
+                            </div>
+                            <div>
+                                <h2 id="overlay-title" class="text-3xl font-extrabold text-white">던전에 입장하세요!</h2>
+                                <p id="overlay-desc" class="text-sm text-slate-400 mt-2 max-w-md">화면에서 내려오는 영단어의 <strong>한글 뜻</strong>을 입력하여 몬스터를 격퇴하세요! 유사한 뜻도 정답 처리됩니다.</p>
+                            </div>
+
+                            <div id="game-stats-summary" class="hidden grid grid-cols-3 gap-4 w-full max-w-sm bg-slate-900 p-4 rounded-xl border border-slate-800 my-1 text-xs">
+                                <div>
+                                    <span class="text-slate-500 block">최종 점수</span>
+                                    <span id="final-score" class="font-bold text-amber-400 text-base">0</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500 block">평균 WPM</span>
+                                    <span id="final-wpm" class="font-bold text-emerald-400 text-base">0</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500 block">처치 몬스터</span>
+                                    <span id="final-kills" class="font-bold text-indigo-400 text-base">0</span>
+                                </div>
+                            </div>
+
+                            <button id="start-game-btn" onclick="startGame()" class="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg shadow-indigo-600/30 transition transform active:scale-95 text-base flex items-center gap-2">
+                                <i class="fa-solid fa-play"></i> 던전 탐험 시작하기
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Typing Input Container -->
+                    <div class="p-4 bg-slate-900 border-t border-slate-800 flex gap-3 items-center">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-i-cursor absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                            <input type="text" id="type-input" placeholder="여기에 영단어의 한글 뜻을 입력하고 Enter를 누르세요..." disabled
+                                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-10 pr-4 py-3 text-white code-font focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition disabled:opacity-50 text-base">
+                        </div>
+                        <button id="submit-btn" onclick="checkTypingInput()" disabled class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl transition text-sm flex items-center gap-1.5 shrink-0">
+                            공격 <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Right Controls & Game Config (4 Cols) -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                
+                <!-- Game Settings -->
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col gap-4">
+                    <h3 class="font-bold text-base text-slate-100 flex items-center gap-2 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-sliders text-indigo-400"></i> 학습 및 난이도 설정
+                    </h3>
+
+                    <!-- Difficulty Selection -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs text-slate-300 font-medium">단어 난이도 (Vocabulary Level)</label>
+                        <select id="diff-select" onchange="changeDifficulty()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="easy">초급 (중등 필수 100단어)</option>
+                            <option value="normal" selected>중급 (수능 기초 100단어)</option>
+                            <option value="hard">고급 (수능 고득점 100단어)</option>
+                        </select>
+                    </div>
+
+                    <!-- Audio Setting -->
+                    <div class="flex items-center justify-between text-xs pt-1">
+                        <span class="text-slate-300 font-medium">공격 효과음 (Sound FX)</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="sound-toggle" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- Auto Meaning Hint -->
+                    <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-800/80">
+                        <span class="text-slate-300 font-medium">단어 힌트(초성/글자수) 표시</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="hint-toggle" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Current Active Target Info -->
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2 text-xs">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                        <h3 class="font-bold text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-bullseye text-indigo-400"></i> 타겟 레이더
+                        </h3>
+                        <button id="toggle-radar-btn" onclick="toggleRadar()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium rounded-lg transition flex items-center gap-1">
+                            <i id="radar-toggle-icon" class="fa-solid fa-eye-slash"></i> <span id="radar-toggle-text">가리기</span>
+                        </button>
+                    </div>
+                    <div id="radar-content" class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                        <div class="flex justify-between text-slate-400">
+                            <span>가장 가까운 영단어:</span>
+                            <span id="target-word-disp" class="font-bold text-indigo-400 code-font text-sm">-</span>
+                        </div>
+                        <div class="flex justify-between text-slate-400">
+                            <span>대표 뜻:</span>
+                            <span id="target-meaning-disp" class="text-slate-200 font-medium">-</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- TAB 2: VOCABULARY & WRONG WORDS NOTE -->
+        <div id="tab-vocab" class="hidden flex-col gap-6">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Incorrect Words Note (7 Cols) -->
+                <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-book-bookmark text-rose-400"></i> 자동 저장 오답 노트
+                            </h2>
+                            <p class="text-xs text-slate-400">게임에서 놓치거나 처치하지 못해 체력이 차감된 단어 목록입니다.</p>
+                        </div>
+                        <button onclick="clearWrongWords()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition">
+                            <i class="fa-solid fa-trash-can mr-1"></i> 목록 비우기
+                        </button>
+                    </div>
+
+                    <div id="wrong-words-list" class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                        <!-- Dynamic Incorrect Items -->
+                        <div class="p-4 bg-slate-950 rounded-xl border border-slate-800/80 text-center text-slate-500 text-xs py-8">
+                            아직 틀린 단어가 없습니다! 게임을 시작해 보세요.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Word Add Form (5 Cols) -->
+                <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-plus-circle text-emerald-400"></i> 커스텀 단어 등록하기
+                    </h2>
+                    <p class="text-xs text-slate-400">시험 범위 영단어나 내가 외우고 싶은 단어를 추가하면 게임 몬스터로 등장합니다.</p>
+
+                    <div class="space-y-3 pt-2">
+                        <div>
+                            <label class="text-xs text-slate-300 block mb-1">영단어 (English)</label>
+                            <input type="text" id="custom-word-input" placeholder="예: algorithm" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white code-font focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-300 block mb-1">한글 뜻 (쉼표로 유사어 구분)</label>
+                            <input type="text" id="custom-meaning-input" placeholder="예: 알고리즘, 연산, 절차" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <button onclick="addCustomWord()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md">
+                            단어장에 추가하기
+                        </button>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800">
+                        <h3 class="text-xs font-bold text-slate-300 mb-2">등록된 사용자 단어 목록</h3>
+                        <div id="custom-words-list" class="space-y-1.5 max-h-[160px] overflow-y-auto text-xs">
+                            <span class="text-slate-500 text-[11px] block">추가된 단어가 없습니다.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Game Logic Script -->
+    <script>
+        // --- Built-in Vocabularies with Multiple Accepted Meanings (m: Array) ---
+        const VOCAB_DATABASE = {
+            easy: [
+                { w: "apple", m: ["사과"] },
+                { w: "school", m: ["학교", "학원"] },
+                { w: "friend", m: ["친구", "벗"] },
+                { w: "pencil", m: ["연필"] },
+                { w: "doctor", m: ["의사", "박사"] },
+                { w: "summer", m: ["여름"] },
+                { w: "family", m: ["가족", "식구"] },
+                { w: "animal", m: ["동물", "짐승"] },
+                { w: "yellow", m: ["노란색", "노랑", "노란"] },
+                { w: "ground", m: ["땅", "운동장", "바닥"] },
+                { w: "bridge", m: ["다리", "교량"] },
+                { w: "action", m: ["행동", "동작", "조치"] },
+                { w: "window", m: ["창문", "창"] },
+                { w: "garden", m: ["정원", "화단"] },
+                { w: "market", m: ["시장", "장터"] },
+                { w: "shadow", m: ["그림자", "그늘"] },
+                { w: "planet", m: ["행성"] },
+                { w: "energy", m: ["에너지", "기운", "활력"] },
+                { w: "future", m: ["미래", "장래"] },
+                { w: "season", m: ["계절"] },
+                { w: "travel", m: ["여행", "이동"] },
+                { w: "memory", m: ["기억", "추억"] },
+                { w: "nature", m: ["자연", "본성"] },
+                { w: "forest", m: ["숲", "산림"] },
+                { w: "island", m: ["섬"] },
+                { w: "stream", m: ["시냇물", "흐름"] },
+                { w: "cloudy", m: ["구름낀", "흐린"] },
+                { w: "silver", m: ["은", "은색"] },
+                { w: "golden", m: ["황금의", "금색의"] },
+                { w: "pocket", m: ["주머니", "포켓"] },
+                { w: "feather", m: ["깃털"] },
+                { w: "bottle", m: ["병", "물병"] },
+                { w: "candle", m: ["양초", "촛불"] },
+                { w: "palace", m: ["궁전", "궁궐"] },
+                { w: "ticket", m: ["표", "티켓"] }
+            ],
+            normal: [
+                { w: "algorithm", m: ["알고리즘", "연산절차", "연산"] },
+                { w: "challenge", m: ["도전", "과제", "난제"] },
+                { w: "education", m: ["교육", "훈육"] },
+                { w: "knowledge", m: ["지식", "학식"] },
+                { w: "community", m: ["공동체", "사회", "지역사회"] },
+                { w: "developer", m: ["개발자"] },
+                { w: "structure", m: ["구조", "건축물", "체계"] },
+                { w: "framework", m: ["뼈대", "틀", "프레임워크"] },
+                { w: "adventure", m: ["모험"] },
+                { w: "potential", m: ["잠재력", "가능성", "잠재적인"] },
+                { w: "experience", m: ["경험", "체험"] },
+                { w: "innovation", m: ["혁신", "쇄신"] },
+                { w: "efficiency", m: ["효율성", "효율"] },
+                { w: "strategy", m: ["전략", "전술"] },
+                { w: "variable", m: ["변수", "변동하는"] },
+                { w: "function", m: ["기능", "함수"] },
+                { w: "database", m: ["데이터베이스", "자료기반"] },
+                { w: "interface", m: ["상호작용", "인터페이스"] },
+                { w: "attribute", m: ["속성", "특성"] },
+                { w: "dimension", m: ["차원", "치수"] },
+                { w: "frequency", m: ["빈도", "주파수"] },
+                { w: "parameter", m: ["매개변수", "인자", "조건"] },
+                { w: "prototype", m: ["원형", "시제품", "프로토타입"] },
+                { w: "solution", m: ["해법", "해결책", "용액"] },
+                { w: "principle", m: ["원리", "원칙"] },
+                { w: "evolution", m: ["진화", "발전"] },
+                { w: "mechanism", m: ["메커니즘", "구조", "장치"] },
+                { w: "perspective", m: ["관점", "시각", "원근법"] },
+                { w: "substance", m: ["물질", "실체", "본질"] },
+                { w: "authority", m: ["권위", "당국", "권한"] },
+                { w: "hypothesis", m: ["가설", "추측"] },
+                { w: "coordinate", m: ["좌표", "조정하다"] },
+                { w: "definition", m: ["정의", "선명도"] },
+                { w: "simulation", m: ["모의실험", "시뮬레이션"] },
+                { w: "proportion", m: ["비율", "부분"] }
+            ],
+            hard: [
+                { w: "architecture", m: ["구조", "건축", "설계"] },
+                { w: "optimization", m: ["최적화"] },
+                { w: "computational", m: ["컴퓨터의", "계산의"] },
+                { w: "synchronous", m: ["동기적인", "동기", "동시의"] },
+                { w: "implementation", m: ["구현", "실행", "이행"] },
+                { w: "transformation", m: ["변형", "전환", "변화"] },
+                { w: "sophisticated", m: ["정교한", "복잡한", "세련된"] },
+                { w: "sustainability", m: ["지속가능성", "지속 가능성"] },
+                { w: "extraordinary", m: ["비범한", "놀라운", "특별한"] },
+                { w: "authentication", m: ["인증", "입증"] },
+                { w: "vulnerability", m: ["취약성", "취약점"] },
+                { w: "infrastructure", m: ["기반시설", "인프라"] },
+                { w: "encapsulation", m: ["캡슐화", "요약"] },
+                { w: "polymorphism", m: ["다형성"] },
+                { w: "asynchronous", m: ["비동기적인", "비동기"] },
+                { w: "reconciliation", m: ["화해", "조정"] },
+                { w: "comprehensive", m: ["종합적인", "포괄적인"] },
+                { w: "interoperability", m: ["상호운용성", "호환성"] },
+                { w: "deterministic", m: ["결정론적인", "확정적인"] },
+                { w: "biodiversity", m: ["생물다양성"] },
+                { w: "globalization", m: ["세계화", "글로벌화"] },
+                { w: "standardization", m: ["표준화", "규격화"] },
+                { w: "proportionality", m: ["비례성", "균형"] },
+                { w: "conceptualization", m: ["개념화"] },
+                { w: "differentiator", m: ["차별화요소", "차별점"] }
+            ]
+        };
+
+        // --- Audio Synth System ---
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playAttack() {
+                if (!document.getElementById('sound-toggle').checked) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(520, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.15);
+                
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+            playHurt() {
+                if (!document.getElementById('sound-toggle').checked) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.25);
+                
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+        }
+
+        const audio = new SoundFX();
+
+        // --- Game State Variables ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let isRunning = false;
+        let score = 0;
+        let hp = 5;
+        let stageLevel = 1;
+        let totalTypedChars = 0;
+        let totalKills = 0;
+        let startTime = 0;
+
+        let monsters = [];
+        let particles = [];
+        let wrongWordsList = [];
+        let customWordsList = [];
+
+        let currentDiff = 'normal';
+        let spawnTimer = 0;
+        let spawnInterval = 3.0; // Seconds
+
+        // Inputs
+        const typeInput = document.getElementById('type-input');
+        const submitBtn = document.getElementById('submit-btn');
+
+        // --- Canvas Calibration ---
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Game Control Functions ---
+        function startGame() {
+            resizeCanvas();
+            document.getElementById('game-overlay').classList.add('hidden');
+            
+            // Reset Stats
+            score = 0;
+            hp = 5;
+            stageLevel = 1;
+            totalTypedChars = 0;
+            totalKills = 0;
+            monsters = [];
+            particles = [];
+            spawnTimer = 0;
+            spawnInterval = 3.0;
+            startTime = performance.now();
+
+            updateUIHearts();
+            document.getElementById('score-val').textContent = '0';
+            document.getElementById('wpm-val').textContent = '0';
+            document.getElementById('level-val').textContent = 'Stage 1';
+
+            typeInput.disabled = false;
+            submitBtn.disabled = false;
+            typeInput.value = '';
+            typeInput.focus();
+
+            isRunning = true;
+        }
+
+        function gameOver() {
+            isRunning = false;
+            typeInput.disabled = true;
+            submitBtn.disabled = true;
+
+            const elapsedMinutes = Math.max((performance.now() - startTime) / 60000, 0.1);
+            const wpm = Math.round((totalTypedChars / 2) / elapsedMinutes); // Adjusted for Korean typing
+
+            document.getElementById('overlay-title').textContent = "던전 탐험 종료!";
+            document.getElementById('overlay-desc').textContent = "체력이 모두 소진되었습니다. 맞히지 못한 단어는 오답 노트에서 복습해 보세요.";
+            document.getElementById('start-game-btn').innerHTML = '<i class="fa-solid fa-rotate-right"></i> 다시 도전하기';
+            
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-wpm').textContent = wpm;
+            document.getElementById('final-kills').textContent = totalKills;
+            
+            document.getElementById('game-stats-summary').classList.remove('hidden');
+            document.getElementById('game-overlay').classList.remove('hidden');
+        }
+
+        function changeDifficulty() {
+            currentDiff = document.getElementById('diff-select').value;
+        }
+
+        // --- Monster Spawning Engine ---
+        function getActiveWordPool() {
+            let pool = [...VOCAB_DATABASE[currentDiff]];
+            if (customWordsList.length > 0) {
+                pool = pool.concat(customWordsList);
+            }
+            return pool;
+        }
+
+        function spawnMonster() {
+            const pool = getActiveWordPool();
+            const activeWords = monsters.map(m => m.word);
+            const available = pool.filter(item => !activeWords.includes(item.w));
+            
+            if (available.length === 0) return;
+
+            const wordObj = available[Math.floor(Math.random() * available.length)];
+            const xMargin = 80;
+            const spawnX = Math.random() * (canvas.width - xMargin * 2) + xMargin;
+
+            // Speed scales with Stage Level
+            const baseSpeed = 25 + stageLevel * 6;
+
+            monsters.push({
+                x: spawnX,
+                y: -30,
+                word: wordObj.w,
+                meanings: Array.isArray(wordObj.m) ? wordObj.m : [wordObj.m],
+                speed: baseSpeed,
+                color: '#6366f1'
+            });
+        }
+
+        // Helper to normalize Korean string (remove whitespace/special chars)
+        function normalizeKorean(str) {
+            return str.replace(/\s+/g, '').toLowerCase();
+        }
+
+        // --- Typing Match Check (Korean Meaning Matching) ---
+        function checkTypingInput() {
+            if (!isRunning) return;
+            const inputVal = normalizeKorean(typeInput.value.trim());
+            if (!inputVal) return;
+
+            // Find closest monster (highest Y) where input match any of the accepted meanings
+            let targetIdx = -1;
+            let maxY = -999;
+
+            for (let i = 0; i < monsters.length; i++) {
+                const m = monsters[i];
+                // Check if user input matches or is contained in any accepted meanings
+                const isMatch = m.meanings.some(meaning => {
+                    const normMeaning = normalizeKorean(meaning);
+                    return normMeaning === inputVal || normMeaning.includes(inputVal) && inputVal.length >= 2;
+                });
+
+                if (isMatch) {
+                    if (m.y > maxY) {
+                        maxY = m.y;
+                        targetIdx = i;
+                    }
+                }
+            }
+
+            if (targetIdx !== -1) {
+                // Success Hit
+                const m = monsters[targetIdx];
+                audio.playAttack();
+                createParticleExplosion(m.x, m.y, '#10b981');
+
+                score += m.word.length * 10 + stageLevel * 5;
+                totalTypedChars += inputVal.length;
+                totalKills++;
+
+                monsters.splice(targetIdx, 1);
+
+                // Stage Progress Check
+                if (totalKills % 7 === 0) {
+                    stageLevel++;
+                    spawnInterval = Math.max(1.2, 3.0 - stageLevel * 0.2);
+                    document.getElementById('level-val').textContent = `Stage ${stageLevel}`;
+                }
+
+                document.getElementById('score-val').textContent = score;
+            } else {
+                // Miss typed - Visual Feedback
+                typeInput.classList.add('border-rose-500', 'animate-shake');
+                setTimeout(() => typeInput.classList.remove('border-rose-500', 'animate-shake'), 300);
+            }
+
+            typeInput.value = '';
+            typeInput.focus();
+        }
+
+        typeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkTypingInput();
+            }
+        });
+
+        // --- Particle FX Engine ---
+        function createParticleExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 6 + 2;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        // --- Main Game Loop ---
+        let lastTime = performance.now();
+
+        function gameLoop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            if (isRunning) {
+                update(dt);
+            }
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // Update Spawner
+            spawnTimer += dt;
+            if (spawnTimer >= spawnInterval) {
+                spawnTimer = 0;
+                spawnMonster();
+            }
+
+            // Update Monsters Position
+            const groundY = canvas.height - 40;
+
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i];
+                m.y += m.speed * dt;
+
+                // Ground Hit check (Missed monster)
+                if (m.y >= groundY) {
+                    audio.playHurt();
+                    createParticleExplosion(m.x, groundY, '#ef4444');
+                    
+                    // Add to Wrong Words Note
+                    addWrongWord(m.word, m.meanings.join(', '));
+
+                    monsters.splice(i, 1);
+                    hp--;
+                    updateUIHearts();
+
+                    if (hp <= 0) {
+                        gameOver();
+                        return;
+                    }
+                }
+            }
+
+            // Update Particle FX
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= dt * 3.0;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Live WPM calculation (Korean CPM base)
+            const elapsedMinutes = Math.max((performance.now() - startTime) / 60000, 0.05);
+            const liveWpm = Math.round((totalTypedChars / 2.5) / elapsedMinutes);
+            document.getElementById('wpm-val').textContent = liveWpm;
+
+            // Radar updates
+            updateRadar();
+        }
+
+        function updateRadar() {
+            if (monsters.length === 0) {
+                document.getElementById('target-word-disp').textContent = '-';
+                document.getElementById('target-meaning-disp').textContent = '-';
+                return;
+            }
+
+            // Find monster closest to ground (highest Y)
+            let closest = monsters[0];
+            for (let m of monsters) {
+                if (m.y > closest.y) closest = m;
+            }
+
+            document.getElementById('target-word-disp').textContent = closest.word;
+            document.getElementById('target-meaning-disp').textContent = closest.meanings.join(', ');
+        }
+
+        function updateUIHearts() {
+            const container = document.getElementById('hp-hearts');
+            container.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                if (i < hp) {
+                    container.innerHTML += '<i class="fa-solid fa-heart text-rose-500"></i>';
+                } else {
+                    container.innerHTML += '<i class="fa-regular fa-heart text-slate-700"></i>';
+                }
+            }
+        }
+
+        // --- Render Engine ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Background Grid & Atmosphere
+            drawDungeonBackground();
+
+            // 2. Draw Ground Boundary
+            const groundY = canvas.height - 40;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, groundY, canvas.width, 40);
+            ctx.strokeStyle = '#f43f5e';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+
+            // 3. Draw Monsters
+            const showMeaning = document.getElementById('hint-toggle').checked;
+
+            monsters.forEach(m => {
+                // Monster Body Node
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, 18, 0, Math.PI * 2);
+                ctx.fillStyle = '#4f46e5';
+                ctx.fill();
+                ctx.strokeStyle = '#818cf8';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Monster Eyes
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(m.x - 6, m.y - 4, 4, 0, Math.PI * 2);
+                ctx.arc(m.x + 6, m.y - 4, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(m.x - 6, m.y - 4, 2, 0, Math.PI * 2);
+                ctx.arc(m.x + 6, m.y - 4, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Word Label Box
+                ctx.font = 'bold 15px "JetBrains Mono", monospace';
+                const textWidth = ctx.measureText(m.word).width;
+                const boxWidth = Math.max(textWidth + 24, 90);
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                ctx.strokeStyle = '#6366f1';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.roundRect(m.x - boxWidth / 2, m.y - 50, boxWidth, showMeaning ? 38 : 24, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                // English Text on Monster
+                ctx.fillStyle = '#38bdf8';
+                ctx.textAlign = 'center';
+                ctx.fillText(m.word, m.x, m.y - 34);
+
+                // Word Hint (Length/First Char Hint)
+                if (showMeaning) {
+                    ctx.font = '10px Pretendard, sans-serif';
+                    ctx.fillStyle = '#a7f3d0';
+                    const hintText = `뜻: ${m.meanings[0][0]}... (${m.meanings[0].length}글자)`;
+                    ctx.fillText(hintText, m.x, m.y - 18);
+                }
+            });
+
+            // 4. Draw Particles
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+        }
+
+        function drawDungeonBackground() {
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+            ctx.lineWidth = 1;
+            const step = 40;
+            for (let x = 0; x < canvas.width; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        // --- Wrong Words Note & Custom Words Logic ---
+        function addWrongWord(word, meaning) {
+            if (!wrongWordsList.some(item => item.w === word)) {
+                wrongWordsList.push({ w: word, m: meaning, count: 1 });
+            } else {
+                const existing = wrongWordsList.find(item => item.w === word);
+                existing.count++;
+            }
+            renderWrongWordsUI();
+        }
+
+        function renderWrongWordsUI() {
+            const listContainer = document.getElementById('wrong-words-list');
+            if (wrongWordsList.length === 0) {
+                listContainer.innerHTML = `<div class="p-4 bg-slate-950 rounded-xl border border-slate-800/80 text-center text-slate-500 text-xs py-8">아직 틀린 단어가 없습니다! 게임을 시작해 보세요.</div>`;
+                return;
+            }
+
+            listContainer.innerHTML = wrongWordsList.map((item) => `
+                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                    <div>
+                        <span class="font-bold text-rose-400 code-font text-sm mr-2">${item.w}</span>
+                        <span class="text-slate-300 font-medium">${item.m}</span>
+                    </div>
+                    <span class="px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold rounded-full text-[10px]">
+                        ${item.count}회 미스
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        function clearWrongWords() {
+            wrongWordsList = [];
+            renderWrongWordsUI();
+        }
+
+        function addCustomWord() {
+            const wInput = document.getElementById('custom-word-input');
+            const mInput = document.getElementById('custom-meaning-input');
+
+            const w = wInput.value.trim().toLowerCase();
+            const mRaw = mInput.value.trim();
+
+            if (!w || !mRaw) {
+                alert('단어와 한글 뜻을 모두 입력해주세요!');
+                return;
+            }
+
+            // Split comma separated accepted meanings
+            const mList = mRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+            customWordsList.push({ w, m: mList });
+            wInput.value = '';
+            mInput.value = '';
+
+            renderCustomWordsUI();
+        }
+
+        function renderCustomWordsUI() {
+            const container = document.getElementById('custom-words-list');
+            if (customWordsList.length === 0) {
+                container.innerHTML = `<span class="text-slate-500 text-[11px] block">추가된 단어가 없습니다.</span>`;
+                return;
+            }
+
+            container.innerHTML = customWordsList.map(item => {
+                const meanings = Array.isArray(item.m) ? item.m.join(', ') : item.m;
+                return `
+                <div class="p-2 bg-slate-950 rounded-lg border border-slate-800 flex justify-between text-[11px]">
+                    <span class="code-font text-emerald-400 font-bold">${item.w}</span>
+                    <span class="text-slate-300">${meanings}</span>
+                </div>
+            `;
+            }).join('');
+        }
+
+        // --- Tab Switching Logic ---
+        function switchTab(tab) {
+            const gameView = document.getElementById('tab-game');
+            const vocabView = document.getElementById('tab-vocab');
+
+            const gameBtn = document.getElementById('tab-game-btn');
+            const vocabBtn = document.getElementById('tab-vocab-btn');
+
+            gameView.classList.add('hidden');
+            vocabView.classList.add('hidden');
+
+            gameBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all duration-200";
+            vocabBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-slate-200 transition-all duration-200";
+
+            if (tab === 'game') {
+                gameView.classList.remove('hidden');
+                gameBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-md";
+            } else if (tab === 'vocab') {
+                vocabView.classList.remove('hidden');
+                vocabView.classList.add('flex');
+                vocabBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow-md";
+            }
+        }
+
+        // --- Target Radar Toggle ---
+        let isRadarVisible = true;
+        function toggleRadar() {
+            isRadarVisible = !isRadarVisible;
+            const content = document.getElementById('radar-content');
+            const icon = document.getElementById('radar-toggle-icon');
+            const text = document.getElementById('radar-toggle-text');
+
+            if (isRadarVisible) {
+                content.classList.remove('hidden');
+                icon.className = 'fa-solid fa-eye-slash';
+                text.textContent = '가리기';
+            } else {
+                content.classList.add('hidden');
+                icon.className = 'fa-solid fa-eye';
+                text.textContent = '보기';
+            }
+        }
+
+        // Init on Load
+        window.onload = function() {
+            resizeCanvas();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
